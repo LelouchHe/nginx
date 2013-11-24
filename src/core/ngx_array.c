@@ -44,6 +44,10 @@ ngx_array_destroy(ngx_array_t *a)
 }
 
 
+/*
+ * 基础数据结构和pool结合的太紧密了吧
+ * 这样是好是坏呢?
+ */
 void *
 ngx_array_push(ngx_array_t *a)
 {
@@ -59,6 +63,7 @@ ngx_array_push(ngx_array_t *a)
 
         p = a->pool;
 
+        /* double the size */
         if ((u_char *) a->elts + size == p->d.last
             && p->d.last + a->size <= p->d.end)
         {

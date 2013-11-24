@@ -13,6 +13,9 @@
 #include <ngx_core.h>
 
 
+/*
+ *  暴漏数据结构是否好呢?
+ */
 typedef struct {
     void        *elts;
     ngx_uint_t   nelts;

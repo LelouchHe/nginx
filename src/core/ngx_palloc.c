@@ -13,6 +13,7 @@ static void *ngx_palloc_block(ngx_pool_t *pool, size_t size);
 static void *ngx_palloc_large(ngx_pool_t *pool, size_t size);
 
 
+/* size > sizeof (ngx_pool_t) */
 ngx_pool_t *
 ngx_create_pool(size_t size, ngx_log_t *log)
 {
@@ -113,6 +114,7 @@ ngx_reset_pool(ngx_pool_t *pool)
 }
 
 
+/* 分配的内存地址会对齐 */
 void *
 ngx_palloc(ngx_pool_t *pool, size_t size)
 {
@@ -126,19 +128,25 @@ ngx_palloc(ngx_pool_t *pool, size_t size)
         do {
             m = ngx_align_ptr(p->d.last, NGX_ALIGNMENT);
 
+            /* 对齐,并且大小合适 */
             if ((size_t) (p->d.end - m) >= size) {
                 p->d.last = m + size;
 
                 return m;
             }
 
+            /* 不调整现有pool,直接顺序遍历 */
             p = p->d.next;
 
         } while (p);
 
+        /* 现有块不合适,重新分配 */
         return ngx_palloc_block(pool, size);
     }
 
+    /*
+     * 直接分配大的内存 
+     */
     return ngx_palloc_large(pool, size);
 }
 
@@ -154,6 +162,7 @@ ngx_pnalloc(ngx_pool_t *pool, size_t size)
         p = pool->current;
 
         do {
+            /* 没有对齐 */
             m = p->d.last;
 
             if ((size_t) (p->d.end - m) >= size) {
@@ -180,6 +189,7 @@ ngx_palloc_block(ngx_pool_t *pool, size_t size)
     size_t       psize;
     ngx_pool_t  *p, *new, *current;
 
+    /* 重新分配block,需要的是p.d的大小 */
     psize = (size_t) (pool->d.end - (u_char *) pool);
 
     m = ngx_memalign(NGX_POOL_ALIGNMENT, psize, pool->log);
@@ -200,11 +210,16 @@ ngx_palloc_block(ngx_pool_t *pool, size_t size)
     current = pool->current;
 
     for (p = current; p->d.next; p = p->d.next) {
+        /* 只有以前全部失败,才会进入这里 */
         if (p->d.failed++ > 4) {
             current = p->d.next;
         }
     }
 
+    /*
+     * 把新的pool连接到最后
+     * current == NULL表示所有的failed>4了
+     */
     p->d.next = new;
 
     pool->current = current ? current : new;
@@ -228,16 +243,19 @@ ngx_palloc_large(ngx_pool_t *pool, size_t size)
     n = 0;
 
     for (large = pool->large; large; large = large->next) {
+        /* 曾经分配过的large没有对应空间,则把新值赋给 */
         if (large->alloc == NULL) {
             large->alloc = p;
             return p;
         }
 
+        /* 最多尝试3次 */
         if (n++ > 3) {
             break;
         }
     }
 
+    /*新建large */
     large = ngx_palloc(pool, sizeof(ngx_pool_large_t));
     if (large == NULL) {
         ngx_free(p);
@@ -277,6 +295,10 @@ ngx_pmemalign(ngx_pool_t *pool, size_t size, size_t alignment)
 }
 
 
+/*
+ * 如果是large,就free掉
+ * 否则不做处理
+ */
 ngx_int_t
 ngx_pfree(ngx_pool_t *pool, void *p)
 {
@@ -293,6 +315,7 @@ ngx_pfree(ngx_pool_t *pool, void *p)
         }
     }
 
+    /* 小的不处理,怎么回收呢? */
     return NGX_DECLINED;
 }
 

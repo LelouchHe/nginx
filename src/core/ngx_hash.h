@@ -15,7 +15,7 @@
 
 typedef struct {
     void             *value;
-    u_short           len;
+    u_short           len; /* name的长度 */
     u_char            name[1];
 } ngx_hash_elt_t;
 
