@@ -40,6 +40,7 @@ ngx_hash_find(ngx_hash_t *hash, ngx_uint_t key, u_char *name, size_t len)
 
     next:
 
+        /* elt是对齐的 */
         elt = (ngx_hash_elt_t *) ngx_align_ptr(&elt->name[0] + elt->len,
                                                sizeof(void *));
         continue;
@@ -61,6 +62,7 @@ ngx_hash_find_wc_head(ngx_hash_wildcard_t *hwc, u_char *name, size_t len)
 
     n = len;
 
+    /* *.example.com => com */
     while (n) {
         if (name[n - 1] == '.') {
             break;
@@ -71,6 +73,7 @@ ngx_hash_find_wc_head(ngx_hash_wildcard_t *hwc, u_char *name, size_t len)
 
     key = 0;
 
+    /* hash for "com" */
     for (i = n; i < len; i++) {
         key = ngx_hash(key, name[i]);
     }
@@ -98,12 +101,18 @@ ngx_hash_find_wc_head(ngx_hash_wildcard_t *hwc, u_char *name, size_t len)
          *          "*.example.com" only.
          */
 
+        /* hash again */
         if ((uintptr_t) value & 2) {
 
             if (n == 0) {
 
                 /* "example.com" */
 
+                /*
+                 * low(value) = 11
+                 * 但name却没有*
+                 * 表示错误
+                 */
                 if ((uintptr_t) value & 1) {
                     return NULL;
                 }
@@ -113,6 +122,7 @@ ngx_hash_find_wc_head(ngx_hash_wildcard_t *hwc, u_char *name, size_t len)
                 return hwc->value;
             }
 
+            /* 没有到头,递归 */
             hwc = (ngx_hash_wildcard_t *) ((uintptr_t) value & (uintptr_t) ~3);
 
             value = ngx_hash_find_wc_head(hwc, name, n - 1);
@@ -121,6 +131,7 @@ ngx_hash_find_wc_head(ngx_hash_wildcard_t *hwc, u_char *name, size_t len)
                 return value;
             }
 
+            /* 没有value,返回最接近的那个 */
             return hwc->value;
         }
 
@@ -163,6 +174,7 @@ ngx_hash_find_wc_tail(ngx_hash_wildcard_t *hwc, u_char *name, size_t len)
         key = ngx_hash(key, name[i]);
     }
 
+    /* 递归尽头 */
     if (i == len) {
         return NULL;
     }
@@ -207,6 +219,7 @@ ngx_hash_find_wc_tail(ngx_hash_wildcard_t *hwc, u_char *name, size_t len)
 }
 
 
+/* 完整hash -> head hash -> tail hash */
 void *
 ngx_hash_find_combined(ngx_hash_combined_t *hash, ngx_uint_t key, u_char *name,
     size_t len)

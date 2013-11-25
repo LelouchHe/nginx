@@ -20,12 +20,29 @@ typedef struct {
 } ngx_hash_elt_t;
 
 
+/*
+ * bucket结构:
+ * | *value | len | name[0] | ... | name[len - 1] | padding | *value | len | ..
+ * value == NULL 表示最后
+ */
 typedef struct {
     ngx_hash_elt_t  **buckets;
     ngx_uint_t        size;
 } ngx_hash_t;
 
-
+/*
+ * hash_wc_t依然是hash,不过是以'.'分割的域名为查找项
+ * value低2bit有特殊含义
+ *
+ * 对于head(*.example.com):
+ * x1: 表示value指向的是类"*.example.com"
+ * 1x: 表示value不是data,而是一个包含date的hash_wc_t,需要递归查找(跳过目前已经查找的项)
+ * 二者可以组合
+ *
+ * 对于tail(example.*):
+ * 00: 指向的是data
+ * 11: 指向的是hash_wc_t
+ */
 typedef struct {
     ngx_hash_t        hash;
     void             *value;
