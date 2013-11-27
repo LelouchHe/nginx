@@ -258,6 +258,11 @@ ngx_hash_find_combined(ngx_hash_combined_t *hash, ngx_uint_t key, u_char *name,
 }
 
 
+/*
+ * FIXME:
+ * 存放的就是ngx_hash_elt_t
+ * +2是要保存'\0'
+ */
 #define NGX_HASH_ELT_SIZE(name)                                               \
     (sizeof(void *) + ngx_align((name)->key.len + 2, sizeof(void *)))
 
@@ -306,6 +311,10 @@ ngx_hash_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names, ngx_uint_t nelts)
             }
 
             key = names[n].key_hash % size;
+            /*
+             * 每个key对应的元素大小
+             * 看样子应该是线性探查(因为冲突之后大小在叠加)
+             */
             test[key] = (u_short) (test[key] + NGX_HASH_ELT_SIZE(&names[n]));
 
 #if 0
@@ -319,7 +328,7 @@ ngx_hash_init(ngx_hash_init_t *hinit, ngx_hash_key_t *names, ngx_uint_t nelts)
             }
         }
 
-        /* 应该是能恰好存放 */
+        /* 应该是能恰好存放所有hash元素的最小size */
         goto found;
 
     next:
